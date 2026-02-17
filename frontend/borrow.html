@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cho mượn sách</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Cho mượn sách</h1>
+      <nav id="nav"></nav>
+
+      <div class="row">
+        <div class="col">
+          <h3>1) Quét thẻ độc giả</h3>
+          <label>Barcode thẻ độc giả</label>
+          <input id="readerBarcode" placeholder="VD: PTIT-VT001" />
+          <button style="margin-top:10px;" class="primary" id="btnFindReader">Tìm độc giả</button>
+          <div id="readerInfo"></div>
+
+          <hr />
+          <h3>2) Quét sách muốn mượn</h3>
+          <div class="small">Nhập từng barcode sách, bấm "Thêm". Giới hạn tối đa 5 cuốn/độc giả (tính cả đang mượn).
+          </div>
+          <label>Barcode sách</label>
+          <input id="copyBarcode" placeholder="VD: MB-001" />
+          <div style="display:flex; gap:10px; margin-top:10px;">
+            <button id="btnAddCopy">Thêm</button>
+            <button class="danger" id="btnClearCopies">Xóa danh sách</button>
+          </div>
+          <div id="copies"></div>
+
+          <div style="display:flex; gap:10px; margin-top:12px;">
+            <button class="primary" id="btnCheckout">Xác nhận cho mượn</button>
+          </div>
+
+          <div id="msg"></div>
+        </div>
+        <div class="col">
+          <h3>Danh sách sách đang mượn</h3>
+          <div id="borrowed"></div>
+
+          <hr />
+          <h3>Lịch sử đã trả</h3>
+          <div id="returned"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <script src="api.js"></script>
+  <script>
+
+    // --- HÀM XỬ LÝ NGÀY ĐẸP ---
+    function formatDate(dateString) {
+      if (!dateString) return "";
+      const d = new Date(dateString);
+      return d.toLocaleDateString('vi-VN'); // Ra dạng: 25/01/2026
+    }
+
+    const user = requireLogin();
+    renderNav("nav");
+
+    let currentReader = null;
+    let selectedCopyBarcodes = [];
+
+    const msg = document.getElementById("msg");
+    const show = (t, ok = false) => msg.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${t}</div>`;
+
+    function renderSelected() {
+      document.getElementById("copies").innerHTML = `
+    <table>
+      <thead><tr><th>#</th><th>Barcode</th><th></th></tr></thead>
+      <tbody>
+        ${selectedCopyBarcodes.map((b, i) => `
+          <tr>
+            <td>${i + 1}</td><td>${b}</td>
+            <td><button data-idx="${i}" class="btnRemove">Xóa</button></td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+      document.querySelectorAll(".btnRemove").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const idx = Number(btn.getAttribute("data-idx"));
+          selectedCopyBarcodes.splice(idx, 1);
+          renderSelected();
+        });
+      });
+    }
+
+    // --- ĐÃ SỬA HÀM NÀY ĐỂ ÁP DỤNG NGÀY ĐẸP ---
+    function renderReader(detail) {
+      const r = detail.reader;
+      document.getElementById("readerInfo").innerHTML = `
+    <div class="msg ok">
+      <b>${r.name}</b> (code: ${r.code})<br/>
+      Barcode: ${r.barcode}<br/>
+      SĐT: ${r.phone || ""} | Đ/c: ${r.address || ""} | DOB: ${formatDate(r.dob)}
+    </div>`;
+
+      // Sửa phần Danh sách đang mượn
+      document.getElementById("borrowed").innerHTML = `
+    <table>
+      <thead><tr><th>Barcode</th><th>Tên</th><th>Tác giả</th><th>Ngày mượn</th><th>Hạn</th></tr></thead>
+      <tbody>
+        ${(detail.borrowed || []).map(x => `
+          <tr>
+            <td>${x.copy_barcode}</td>
+            <td>${x.title}</td>
+            <td>${x.author}</td>
+            <td>${formatDate(x.borrow_date)}</td> <td>${formatDate(x.due_date)}</td>    </tr>`).join("")}
+      </tbody>
+    </table>
+    <div class="small">Tổng đang mượn: ${(detail.borrowed || []).length}</div>
+  `;
+
+      // Sửa phần Lịch sử đã trả
+      document.getElementById("returned").innerHTML = `
+    <table>
+      <thead><tr><th>Barcode</th><th>Tên</th><th>Ngày trả</th><th>Phí</th></tr></thead>
+      <tbody>
+        ${(detail.returned || []).slice(0, 10).map(x => `
+          <tr>
+            <td>${x.copy_barcode}</td>
+            <td>${x.title}</td>
+            <td>${formatDate(x.return_date)}</td> <td>${x.total_fee}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>
+    <div class="small">Hiển thị 10 dòng gần nhất</div>
+  `;
+    }
+
+    document.getElementById("btnFindReader").addEventListener("click", async () => {
+      msg.innerHTML = "";
+      try {
+        const barcode = document.getElementById("readerBarcode").value.trim();
+        if (!barcode) throw new Error("Nhập barcode độc giả");
+        const list = await apiFetch(`/readers?q=${encodeURIComponent(barcode)}`);
+        const reader = (list.data || []).find(x => x.barcode === barcode) || (list.data || [])[0];
+        if (!reader) throw new Error("Không tìm thấy độc giả");
+        const detail = await apiFetch(`/readers/${reader.id}`);
+        currentReader = reader;
+        renderReader(detail);
+        show("Đã tải thông tin độc giả", true);
+      } catch (e) { show(e.message); }
+    });
+
+    document.getElementById("btnAddCopy").addEventListener("click", () => {
+      const b = document.getElementById("copyBarcode").value.trim();
+      if (!b) return;
+      if (selectedCopyBarcodes.includes(b)) return;
+      selectedCopyBarcodes.push(b);
+      document.getElementById("copyBarcode").value = "";
+      renderSelected();
+    });
+
+    document.getElementById("btnClearCopies").addEventListener("click", () => {
+      selectedCopyBarcodes = [];
+      renderSelected();
+    });
+
+    document.getElementById("btnCheckout").addEventListener("click", async () => {
+      msg.innerHTML = "";
+      try {
+        if (!currentReader) throw new Error("Chưa chọn độc giả");
+        if (selectedCopyBarcodes.length === 0) throw new Error("Chưa chọn sách");
+        const data = await apiFetch("/borrow/checkout", {
+          method: "POST",
+          body: JSON.stringify({ reader_id: currentReader.id, copy_barcodes: selectedCopyBarcodes })
+        });
+        selectedCopyBarcodes = [];
+        renderSelected();
+        const detail = await apiFetch(`/readers/${currentReader.id}`);
+        renderReader(detail);
+
+        // Sửa thêm chỗ thông báo này cho đẹp luôn
+        const formattedDueDate = formatDate(data.due_date);
+        show(`${data.message}. Hạn trả: ${formattedDueDate}`, true);
+
+      } catch (e) { show(e.message); }
+    });
+
+    renderSelected();
+
+  </script>
+</body>
+
+</html>

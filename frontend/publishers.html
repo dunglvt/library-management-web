@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quản lý Nhà xuất bản</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .filter-box {
+      background: #f8fafc;
+      padding: 24px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      font-size: 0.95rem;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #475569;
+      font-weight: 700;
+      padding: 12px 16px;
+      border-bottom: 2px solid #e2e8f0;
+      text-align: left;
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #e2e8f0;
+      color: #334155;
+      vertical-align: middle;
+    }
+
+    tr:hover td {
+      background: #f8fafc;
+    }
+
+    .msg {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .msg.ok {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+    }
+
+    .msg.err {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+
+    /* Style cho nút Xóa */
+    .btnDelete {
+      cursor: pointer;
+      color: #ef4444;
+      /* Màu đỏ */
+      background: none;
+      border: none;
+      font-weight: 600;
+      margin-left: 10px;
+    }
+
+    .btnDelete:hover {
+      text-decoration: underline;
+    }
+
+    .btnEdit {
+      cursor: pointer;
+      color: #0d9488;
+      /* Màu xanh */
+      background: none;
+      border: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+  <nav id="nav"></nav>
+
+  <div class="container">
+    <div class="card">
+      <h1>Quản lý Nhà xuất bản</h1>
+
+      <div class="row">
+        <div class="col" style="flex: 0 0 320px;">
+          <div class="filter-box">
+            <h3 style="margin-top:0; color:#334155;">🛠️ Thêm / Sửa</h3>
+            <input type="hidden" id="id" />
+            <label>Tên nhà xuất bản <span style="color:red">*</span></label>
+            <input id="name" placeholder="VD: NXB Kim Đồng" autocomplete="off" />
+            <div style="display:flex; gap:10px; margin-top:20px;">
+              <button class="primary" id="btnSave" style="flex:1">Lưu</button>
+              <button id="btnClear" style="flex:1; background:#fff; border:1px solid #cbd5e1">Xóa form</button>
+            </div>
+            <div id="msg"></div>
+          </div>
+        </div>
+
+        <div class="col" style="flex: 1;">
+          <h3 style="margin-top:0;">📋 Danh sách Nhà xuất bản</h3>
+          <div style="display:flex; gap:5px; margin-bottom:15px;">
+            <input id="q" placeholder="Nhập tên NXB để tìm..." style="max-width: 300px;" autocomplete="off" />
+            <button id="btnSearch">Tìm kiếm</button>
+          </div>
+          <div id="list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script>
+    const user = requireLogin();
+    renderNav("nav");
+
+    const msg = document.getElementById("msg");
+    const show = (t, ok = false) => msg.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${t}</div>`;
+    let currentData = [];
+
+    function normalizeName(str) {
+      if (!str) return "";
+      return str.toLowerCase().replace(/^(nxb|nhà xuất bản)\s+/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    function clearForm() {
+      document.getElementById("id").value = "";
+      document.getElementById("name").value = "";
+      msg.innerHTML = "";
+    }
+    document.getElementById("btnClear").addEventListener("click", clearForm);
+
+    async function load() {
+      try {
+        const q = document.getElementById("q").value.trim();
+        const data = await apiFetch("/publishers" + (q ? `?q=${encodeURIComponent(q)}` : ""));
+        currentData = data.data || [];
+
+        document.getElementById("list").innerHTML = `
+        <table>
+          <thead>
+            <tr>
+                <th style="width: 60px;">STT</th>
+                <th>Tên Nhà xuất bản</th>
+                <th style="width: 120px; text-align:right;">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${currentData.map((r, index) => `
+              <tr>
+                <td style="color:#64748b; font-weight:bold;">${index + 1}</td>
+                <td><b>${r.name}</b></td>
+                <td style="text-align:right;">
+                    <button class="btnEdit" data-id="${r.id}" data-name="${r.name}">Sửa</button>
+                    <button class="btnDelete" data-id="${r.id}" data-name="${r.name}">Xóa</button>
+                </td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`;
+
+        // Sự kiện Sửa
+        document.querySelectorAll(".btnEdit").forEach(btn => {
+          btn.addEventListener("click", () => {
+            document.getElementById("id").value = btn.getAttribute("data-id");
+            document.getElementById("name").value = btn.getAttribute("data-name");
+            show("Đã nạp dữ liệu. Hãy sửa và bấm Lưu.", true);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          });
+        });
+
+        // --- SỰ KIỆN XÓA ---
+        document.querySelectorAll(".btnDelete").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-id");
+            const name = btn.getAttribute("data-name");
+
+            if (confirm(`Bạn có chắc chắn muốn xóa Nhà xuất bản "${name}" không?`)) {
+              try {
+                show("Đang xóa...", true);
+                await apiFetch(`/publishers/${id}`, { method: "DELETE" });
+                show(`✅ Đã xóa thành công: ${name}`, true);
+                load(); // Tải lại danh sách
+                if (document.getElementById("id").value === id) clearForm(); // Nếu đang sửa chính nó thì xóa form
+              } catch (e) {
+                // Lỗi thường gặp: Nhà xuất bản đang có sách liên kết
+                if (e.message.includes("foreign key")) {
+                  show("❌ Không thể xóa! Nhà xuất bản này đang có đầu sách liên kết trong hệ thống.", false);
+                } else {
+                  show("❌ Lỗi: " + e.message, false);
+                }
+              }
+            }
+          });
+        });
+
+      } catch (e) { show(e.message); }
+    }
+
+    document.getElementById("btnSearch").addEventListener("click", load);
+
+    document.getElementById("btnSave").addEventListener("click", async () => {
+      show("Đang xử lý...", true);
+      try {
+        const id = document.getElementById("id").value.trim();
+        const name = document.getElementById("name").value.trim();
+        if (!name) throw new Error("Vui lòng nhập tên Nhà xuất bản!");
+
+        const inputNormalized = normalizeName(name);
+        const duplicate = currentData.find(p => {
+          if (id && String(p.id) === String(id)) return false;
+          return normalizeName(p.name) === inputNormalized;
+        });
+        if (duplicate) throw new Error(`⚠️ Tên này đã tồn tại dưới dạng: "${duplicate.name}"`);
+
+        if (id) {
+          await apiFetch(`/publishers/${id}`, { method: "PUT", body: JSON.stringify({ name }) });
+          show("✅ Cập nhật thành công!", true);
+        } else {
+          await apiFetch("/publishers", { method: "POST", body: JSON.stringify({ name }) });
+          show("✅ Thêm mới thành công!", true);
+        }
+        clearForm();
+        await load();
+      } catch (e) { show(e.message); }
+    });
+
+    load();
+  </script>
+</body>
+
+</html>

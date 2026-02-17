@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quản lý lỗi hỏng & tiền phạt</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* CSS Giao diện Báo cáo Chuyên nghiệp */
+    .filter-box {
+      background: #f8fafc;
+      padding: 24px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      font-size: 0.95rem;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #475569;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+      padding: 12px 16px;
+      border-bottom: 2px solid #e2e8f0;
+      text-align: left;
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #e2e8f0;
+      color: #334155;
+      vertical-align: middle;
+    }
+
+    tr:hover td {
+      background: #f8fafc;
+    }
+  </style>
+</head>
+
+<body>
+  <nav id="nav"></nav>
+
+  <div class="container">
+    <div class="card">
+      <h1>Quản lý lỗi hỏng & tiền phạt</h1>
+
+      <div class="row">
+        <div class="col" style="flex: 0 0 300px;">
+          <div class="filter-box">
+            <h3 style="margin-top:0; color:#334155; font-size:1.1rem;">Thêm / Sửa lỗi hỏng</h3>
+
+            <label>ID (khi sửa)</label>
+            <input id="id" placeholder="Để trống khi thêm" style="background:#f1f5f9" readonly />
+
+            <label>Tên lỗi</label>
+            <input id="name" placeholder="VD: Rách bìa" autocomplete="off" />
+
+            <label>Phí mặc định</label>
+            <input id="default_fee" type="number" value="0" />
+
+            <div style="display:flex; gap:10px; margin-top:24px;">
+              <button class="primary" id="btnSave" style="flex:1">Lưu</button>
+              <button id="btnClear" style="flex:1; background:#fff; border:1px solid #cbd5e1">Xóa form</button>
+            </div>
+
+            <div id="msg"></div>
+          </div>
+        </div>
+
+        <div class="col" style="flex: 1;">
+          <h3 style="margin-top:0;">📋 Danh sách lỗi hỏng</h3>
+          <div id="list"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script>
+    // --- GIỮ NGUYÊN 100% LOGIC CŨ ---
+    const user = requireLogin();
+    renderNav("nav");
+
+    const msg = document.getElementById("msg");
+    const show = (t, ok = false) => msg.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${t}</div>`;
+
+    function clearForm() {
+      document.getElementById("id").value = "";
+      document.getElementById("name").value = "";
+      document.getElementById("default_fee").value = 0;
+      // Bỏ readonly khi thêm mới để tránh hiểu lầm, tuy nhiên logic cũ ID thường tự sinh hoặc readonly
+      // Ở đây tôi giữ nguyên logic code cũ của bạn là input ID vẫn cho nhập (hoặc readonly tùy bạn chỉnh sau)
+    }
+
+    document.getElementById("btnClear").addEventListener("click", () => { clearForm(); msg.innerHTML = ""; });
+
+    async function load() {
+      const data = await apiFetch("/damage-types");
+      const rows = data.data || [];
+      document.getElementById("list").innerHTML = `
+    <table>
+      <thead><tr><th style="width:50px">ID</th><th>Tên lỗi</th><th style="text-align:right">Phí mặc định</th><th style="width:80px"></th></tr></thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr>
+            <td style="color:#64748b">${r.id}</td>
+            <td><b>${r.name}</b></td>
+            <td style="text-align:right; font-weight:600">${Number(r.default_fee).toLocaleString('vi-VN')}</td>
+            <td style="text-align:center"><button class="btnEdit" data-id="${r.id}" style="color:var(--accent); background:none; border:none; cursor:pointer; font-weight:600">Sửa</button></td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+
+      document.querySelectorAll(".btnEdit").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-id");
+          const r = rows.find(x => String(x.id) === String(id));
+          document.getElementById("id").value = r.id;
+          document.getElementById("name").value = r.name;
+          document.getElementById("default_fee").value = r.default_fee;
+          show("Đã nạp dữ liệu lên form", true);
+        });
+      });
+    }
+
+    document.getElementById("btnSave").addEventListener("click", async () => {
+      msg.innerHTML = "";
+      try {
+        const id = document.getElementById("id").value.trim();
+        const payload = {
+          name: document.getElementById("name").value.trim(),
+          default_fee: Number(document.getElementById("default_fee").value || 0)
+        };
+        if (!payload.name) throw new Error("Thiếu tên lỗi");
+        if (id) {
+          await apiFetch(`/damage-types/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+          show("Cập nhật thành công", true);
+        } else {
+          await apiFetch("/damage-types", { method: "POST", body: JSON.stringify(payload) });
+          show("Thêm mới thành công", true);
+        }
+        clearForm();
+        await load();
+      } catch (e) { show(e.message); }
+    });
+
+    load();
+
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Đăng nhập - Quản lý thư viện</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --primary: #0d9488;
+      --primary-dark: #0f766e;
+      --bg-gradient-start: #ccfbf1;
+      --bg-gradient-end: #f0fdfa;
+      --text-dark: #1e293b;
+      --text-muted: #64748b;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+      background-image:
+        radial-gradient(at 40% 20%, rgba(13, 148, 136, 0.1) 0px, transparent 50%),
+        radial-gradient(at 80% 0%, rgba(45, 212, 191, 0.1) 0px, transparent 50%),
+        linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+    }
+
+    .card {
+      width: 100%;
+      max-width: 380px;
+      padding: 40px 35px;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 0 20px 40px -10px rgba(13, 148, 136, 0.15), 0 10px 20px -5px rgba(0, 0, 0, 0.05);
+      animation: slideUp 0.5s ease-out forwards;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    h1 {
+      text-align: center;
+      color: var(--primary);
+      font-size: 1.8rem;
+      font-weight: 800;
+      margin: 0 0 10px 0;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 30px;
+    }
+
+    label {
+      font-weight: 600;
+      color: var(--text-dark);
+      margin-bottom: 8px;
+      display: block;
+      font-size: 0.9rem;
+      margin-top: 20px;
+    }
+
+    input {
+      width: 100%;
+      background: #fff;
+      border: 1.5px solid #e2e8f0;
+      height: 44px;
+      padding: 0 15px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+    }
+
+    input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.15);
+    }
+
+    button.primary {
+      width: 100%;
+      height: 44px;
+      font-size: 1rem;
+      margin-top: 30px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      border: none;
+      color: white;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 25px -5px rgba(13, 148, 136, 0.4);
+      transition: all 0.3s ease;
+    }
+
+    button.primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      filter: brightness(1.1);
+    }
+
+    button.primary:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    /* --- HIỆU ỨNG SPINNER --- */
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 0.8s ease-in-out infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .msg {
+      margin-top: 25px;
+      padding: 12px;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .msg.err {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+      animation: shake 0.5s both;
+    }
+
+    .msg.ok {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+    }
+
+    @keyframes shake {
+
+      10%,
+      90% {
+        transform: translate3d(-1px, 0, 0);
+      }
+
+      20%,
+      80% {
+        transform: translate3d(2px, 0, 0);
+      }
+
+      30%,
+      50%,
+      70% {
+        transform: translate3d(-4px, 0, 0);
+      }
+
+      40%,
+      60% {
+        transform: translate3d(4px, 0, 0);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <div style="text-align: center; font-size: 3rem; margin-bottom: 10px;">📚</div>
+    <h1>Đăng Nhập</h1>
+    <div class="subtitle">Hệ thống Quản lý Thư viện</div>
+
+    <label>Tài khoản</label>
+    <input id="username" placeholder="Nhập tên đăng nhập..." autocomplete="off" />
+
+    <label>Mật khẩu</label>
+    <input id="password" type="password" placeholder="••••••••" autocomplete="off" />
+
+    <button class="primary" id="btnLogin">Đăng nhập hệ thống</button>
+    <div id="msg"></div>
+  </div>
+
+  <script src="api.js"></script>
+  <script>
+    const msg = document.getElementById("msg");
+    const btnLogin = document.getElementById("btnLogin");
+
+    const show = (text, ok = false) => {
+      msg.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${text}</div>`;
+    };
+
+    btnLogin.addEventListener("click", async () => {
+      msg.innerHTML = "";
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+
+      if (!username || !password) {
+        show("Thông tin tài khoản hoặc mật khẩu không hợp lệ");
+        return;
+      }
+
+      // TRẠNG THÁI LOADING
+      btnLogin.disabled = true;
+      const originalBtnText = btnLogin.innerHTML;
+      btnLogin.innerHTML = `<span class="spinner"></span> Đang xác thực...`;
+
+      try {
+        const data = await apiFetch("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ username, password })
+        });
+
+        if (typeof setSession === 'function') {
+          setSession(data.token, data.user);
+        } else {
+          localStorage.setItem("token", data.token);
+          if (data.user) localStorage.setItem("user", JSON.stringify(data.user));
+        }
+
+        show("Đăng nhập thành công!", true);
+        setTimeout(() => { location.href = "dashboard.html"; }, 600);
+
+      } catch (e) {
+        show("Thông tin tài khoản hoặc mật khẩu không hợp lệ");
+        btnLogin.disabled = false;
+        btnLogin.innerHTML = originalBtnText;
+        document.getElementById("password").value = "";
+        document.getElementById("password").focus();
+      }
+    });
+
+    // Enter để đăng nhập
+    [document.getElementById("username"), document.getElementById("password")].forEach(el => {
+      el.addEventListener("keypress", (e) => {
+        if (e.key === "Enter" && !btnLogin.disabled) btnLogin.click();
+      });
+    });
+
+    document.getElementById("username").focus();
+  </script>
+</body>
+
+</html>

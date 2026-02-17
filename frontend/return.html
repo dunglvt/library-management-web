@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trả sách</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Trả sách</h1>
+      <nav id="nav"></nav>
+
+      <div class="row">
+        <div class="col">
+          <h3>1) Quét thẻ độc giả</h3>
+          <label>Barcode thẻ độc giả</label>
+          <input id="readerBarcode" placeholder="VD: PTIT-VT001" />
+          <button style="margin-top:10px;" class="primary" id="btnFindReader">Tìm độc giả</button>
+          <div id="readerInfo"></div>
+
+          <hr />
+          <h3>2) Quét sách trả</h3>
+          <label>Barcode sách</label>
+          <input id="copyBarcode" placeholder="VD: MB-001" />
+          <button style="margin-top:10px;" id="btnScan">Scan</button>
+
+          <div id="scanInfo"></div>
+
+          <hr />
+          <h3>3) Chọn lỗi hỏng (nếu có) và xác nhận</h3>
+          <div class="small">Chọn các lỗi hỏng rồi nhập phí (có sẵn phí mặc định).</div>
+          <div id="damages"></div>
+          <button class="primary" id="btnConfirm">Xác nhận trả sách</button>
+
+          <div id="msg"></div>
+        </div>
+
+        <div class="col">
+          <h3>Sách đang mượn</h3>
+          <div id="borrowed"></div>
+          <hr />
+          <h3>Lịch sử đã trả</h3>
+          <div id="returned"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <script src="api.js"></script>
+  <script>
+    // --- HÀM XỬ LÝ NGÀY ĐẸP (Thêm mới) ---
+    function formatDate(dateString) {
+      if (!dateString) return "";
+      const d = new Date(dateString);
+      return d.toLocaleDateString('vi-VN'); // Ra dạng: 25/01/2026
+    }
+
+    const user = requireLogin();
+    renderNav("nav");
+
+    let currentReader = null;
+    let currentScan = null; // {borrow_item_id,...,late_fee}
+    let damageTypes = [];
+
+    const msg = document.getElementById("msg");
+    const show = (t, ok = false) => msg.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${t}</div>`;
+
+    function renderReader(detail) {
+      const r = detail.reader;
+      // Sửa hiển thị DOB
+      document.getElementById("readerInfo").innerHTML = `
+    <div class="msg ok">
+      <b>${r.name}</b> (code: ${r.code})<br/>
+      Barcode: ${r.barcode}<br/>
+      DOB: ${formatDate(r.dob)} </div>`;
+
+      // Sửa bảng đang mượn (formatDate cho due_date)
+      document.getElementById("borrowed").innerHTML = `
+    <table>
+      <thead><tr><th>Barcode</th><th>Tên</th><th>Hạn</th></tr></thead>
+      <tbody>
+        ${(detail.borrowed || []).map(x => `
+          <tr>
+            <td>${x.copy_barcode}</td>
+            <td>${x.title}</td>
+            <td>${formatDate(x.due_date)}</td> </tr>`).join("")}
+      </tbody>
+    </table>
+    <div class="small">Tổng đang mượn: ${(detail.borrowed || []).length}</div>
+  `;
+
+      // Sửa bảng lịch sử trả (formatDate cho return_date)
+      document.getElementById("returned").innerHTML = `
+    <table>
+      <thead><tr><th>Barcode</th><th>Tên</th><th>Ngày trả</th><th>Phí</th></tr></thead>
+      <tbody>
+        ${(detail.returned || []).slice(0, 10).map(x => `
+          <tr>
+            <td>${x.copy_barcode}</td>
+            <td>${x.title}</td>
+            <td>${formatDate(x.return_date)}</td> <td>${x.total_fee}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>
+  `;
+    }
+
+    function renderDamageList() {
+      if (!currentScan) {
+        document.getElementById("damages").innerHTML = "<div class='small'>Chưa scan sách.</div>";
+        return;
+      }
+      document.getElementById("damages").innerHTML = `
+    <table>
+      <thead><tr><th>Chọn</th><th>Lỗi</th><th>Phí</th></tr></thead>
+      <tbody>
+        ${damageTypes.map(dt => `
+          <tr>
+            <td><input type="checkbox" class="ck" data-id="${dt.id}"/></td>
+            <td>${dt.name}</td>
+            <td><input type="number" class="fee" data-id="${dt.id}" value="${dt.default_fee}" min="0"/></td>
+          </tr>`).join("")}
+      </tbody>
+    </table>
+    <div class="small">Phạt trả muộn (tự tính): <b>${currentScan.late_fee}</b> VNĐ</div>
+  `;
+    }
+
+    document.getElementById("btnFindReader").addEventListener("click", async () => {
+      msg.innerHTML = "";
+      currentScan = null;
+      document.getElementById("scanInfo").innerHTML = "";
+      try {
+        const barcode = document.getElementById("readerBarcode").value.trim();
+        if (!barcode) throw new Error("Nhập barcode độc giả");
+        const list = await apiFetch(`/readers?q=${encodeURIComponent(barcode)}`);
+        const reader = (list.data || []).find(x => x.barcode === barcode) || (list.data || [])[0];
+        if (!reader) throw new Error("Không tìm thấy độc giả");
+        const detail = await apiFetch(`/readers/${reader.id}`);
+        currentReader = reader;
+        renderReader(detail);
+        renderDamageList();
+        show("Đã tải thông tin độc giả", true);
+      } catch (e) { show(e.message); }
+    });
+
+    document.getElementById("btnScan").addEventListener("click", async () => {
+      msg.innerHTML = "";
+      try {
+        if (!currentReader) throw new Error("Chưa chọn độc giả");
+        const copy_barcode = document.getElementById("copyBarcode").value.trim();
+        if (!copy_barcode) throw new Error("Nhập barcode sách");
+        const scan = await apiFetch("/return/scan", {
+          method: "POST",
+          body: JSON.stringify({ reader_id: currentReader.id, copy_barcode })
+        });
+        currentScan = scan;
+
+        // Sửa hiển thị Hạn trả sau khi scan
+        document.getElementById("scanInfo").innerHTML = `
+      <div class="msg ok">
+        <b>Đã scan:</b> ${scan.title} (${scan.copy_barcode})<br/>
+        Hạn trả: ${formatDate(scan.due_date)} | Phạt trễ: <b>${scan.late_fee}</b> VNĐ </div>`;
+
+        renderDamageList();
+        show("Giờ chọn lỗi hỏng (nếu có) rồi bấm Xác nhận.", true);
+      } catch (e) { show(e.message); }
+    });
+
+    document.getElementById("btnConfirm").addEventListener("click", async () => {
+      msg.innerHTML = "";
+      try {
+        if (!currentReader) throw new Error("Chưa chọn độc giả");
+        if (!currentScan) throw new Error("Chưa scan sách");
+        // collect selected damages
+        const damages = [];
+        document.querySelectorAll(".ck").forEach(ck => {
+          if (ck.checked) {
+            const id = Number(ck.getAttribute("data-id"));
+            const feeInput = document.querySelector(`.fee[data-id="${id}"]`);
+            const fee = Number(feeInput.value || 0);
+            damages.push({ damage_type_id: id, fee });
+          }
+        });
+        const data = await apiFetch("/return/confirm", {
+          method: "POST",
+          body: JSON.stringify({
+            borrow_item_id: currentScan.borrow_item_id,
+            damages
+          })
+        });
+        // refresh reader view
+        const detail = await apiFetch(`/readers/${currentReader.id}`);
+        renderReader(detail);
+        // reset scan
+        currentScan = null;
+        document.getElementById("scanInfo").innerHTML = "";
+        renderDamageList();
+        document.getElementById("copyBarcode").value = "";
+        show(`${data.message}. Tổng phí: ${data.total_fee} (trễ: ${data.late_fee}, hỏng: ${data.damage_fee})`, true);
+      } catch (e) { show(e.message); }
+    });
+
+    async function init() {
+      const dt = await apiFetch("/damage-types");
+      damageTypes = dt.data || [];
+      renderDamageList();
+    }
+    init();
+
+  </script>
+</body>
+
+</html>

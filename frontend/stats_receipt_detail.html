@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chi tiết phiếu mượn</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Chi tiết phiếu mượn</h1>
+      <nav id="nav"></nav>
+
+      <div class="small"><a href="javascript:history.back()">← Quay lại</a></div>
+      <hr />
+      <div id="head"></div>
+      <h3>Danh sách sách trong phiếu</h3>
+      <div id="out"></div>
+      <div id="msg"></div>
+
+    </div>
+  </div>
+  <script src="api.js"></script>
+  <script>
+    // --- THÊM HÀM FORMAT NGÀY ---
+    function formatDate(dateString) {
+      if (!dateString) return "";
+      const d = new Date(dateString);
+      return d.toLocaleDateString('vi-VN');
+    }
+
+    const user = requireLogin();
+    renderNav("nav");
+
+    const msg = document.getElementById("msg");
+    const show = (t, ok = false) => msg.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${t}</div>`;
+
+    function getParam(name) {
+      const u = new URL(location.href);
+      return u.searchParams.get(name);
+    }
+    const receipt_id = getParam("receipt_id");
+
+    (async () => {
+      try {
+        if (!receipt_id) throw new Error("Thiếu receipt_id trên URL");
+        const data = await apiFetch(`/stats/receipts/${receipt_id}`);
+        const r = data.receipt;
+        document.getElementById("head").innerHTML = `
+      <div class="msg ok">
+        <b>Phiếu mượn #${r.id}</b><br/>
+        Ngày mượn: ${formatDate(r.borrow_date)}<br/> Độc giả: ${r.reader_name} (${r.reader_code})<br/>
+        Thủ thư: ${r.librarian_username}
+      </div>
+    `;
+        const rows = data.items || [];
+        document.getElementById("out").innerHTML = `
+      <table>
+        <thead><tr><th>Barcode</th><th>Mã đầu sách</th><th>Tên</th><th>Hạn trả</th><th>Ngày trả</th><th>Phí</th></tr></thead>
+        <tbody>
+          ${rows.map(x => `
+            <tr>
+              <td>${x.copy_barcode}</td>
+              <td>${x.title_code}</td>
+              <td>${x.title} (${x.author})</td>
+              <td>${formatDate(x.due_date)}</td>    <td>${formatDate(x.return_date)}</td> <td>${x.total_fee || 0}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    `;
+      } catch (e) { show(e.message); }
+    })();
+
+  </script>
+</body>
+
+</html>

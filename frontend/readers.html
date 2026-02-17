@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quản lý độc giả</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <nav id="nav"></nav>
+
+  <div class="container">
+    <div class="card">
+      <h1>Quản lý độc giả</h1>
+
+      <div class="row">
+        <div class="col">
+          <h3>Thêm / Sửa độc giả</h3>
+
+          <input type="hidden" id="id" />
+
+          <label>Mã độc giả</label>
+          <input id="code" placeholder="VD: N23DCVT000" autocomplete="off" />
+
+          <label>Họ tên</label>
+          <input id="name" placeholder="VD: Nguyễn Văn A" autocomplete="off" />
+
+          <label>Ngày sinh</label>
+          <input id="dob" type="date" autocomplete="off" />
+
+          <label>Địa chỉ</label>
+          <input id="address" placeholder="VD: Hà Nội" autocomplete="off" />
+
+          <label>SĐT</label>
+          <input id="phone" placeholder="VD: 0123456789" autocomplete="off" />
+
+          <label>Mã số thẻ (Barcode)</label>
+          <input id="barcode" placeholder="VD: PTIT-VT001" autocomplete="off" />
+
+          <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="primary" id="btnSave">Lưu thông tin</button>
+            <button id="btnClear">Xóa form</button>
+          </div>
+          <div id="msg"></div>
+        </div>
+
+        <div class="col">
+          <h3>Danh sách độc giả</h3>
+          <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <input id="q" placeholder="Tìm theo tên/mã/barcode..." autocomplete="off" />
+            <button id="btnSearch">Tìm</button>
+          </div>
+          <div id="list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script>
+    function formatDate(dateString) {
+      if (!dateString) return "";
+      const d = new Date(dateString);
+      return d.toLocaleDateString('vi-VN');
+    }
+
+    const user = requireLogin();
+    renderNav("nav");
+
+    const msg = document.getElementById("msg");
+    const show = (t, ok = false) => msg.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${t}</div>`;
+
+    // JavaScript vẫn hoạt động bình thường vì nó lấy value từ thẻ hidden
+    function fillForm(r) {
+      document.getElementById("id").value = r.id;
+      document.getElementById("code").value = r.code;
+      document.getElementById("name").value = r.name;
+      document.getElementById("dob").value = r.dob ? r.dob.split('T')[0] : "";
+      document.getElementById("address").value = r.address || "";
+      document.getElementById("phone").value = r.phone || "";
+      document.getElementById("barcode").value = r.barcode;
+    }
+
+    function clearForm() {
+      document.getElementById("id").value = "";
+      document.getElementById("code").value = "";
+      document.getElementById("name").value = "";
+      document.getElementById("dob").value = "";
+      document.getElementById("address").value = "";
+      document.getElementById("phone").value = "";
+      document.getElementById("barcode").value = "";
+      msg.innerHTML = "";
+    }
+    document.getElementById("btnClear").addEventListener("click", clearForm);
+
+    function getForm() {
+      return {
+        code: document.getElementById("code").value.trim(),
+        name: document.getElementById("name").value.trim(),
+        dob: document.getElementById("dob").value || null,
+        address: document.getElementById("address").value.trim(),
+        phone: document.getElementById("phone").value.trim(),
+        barcode: document.getElementById("barcode").value.trim(),
+      };
+    }
+
+    async function load() {
+      try {
+        const q = document.getElementById("q").value.trim();
+        const res = await apiFetch(`/readers?q=${encodeURIComponent(q)}`);
+        const rows = res.data || [];
+        const html = `
+        <table>
+          <thead><tr><th>Mã</th><th>Tên</th><th>Ngày sinh</th><th>Barcode</th><th></th></tr></thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr>
+                <td><b>${r.code}</b></td>
+                <td>${r.name}</td>
+                <td>${formatDate(r.dob)}</td> 
+                <td><code>${r.barcode}</code></td>
+                <td><button data-id="${r.id}" class="btnEdit">Sửa</button></td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`;
+        document.getElementById("list").innerHTML = html;
+
+        document.querySelectorAll(".btnEdit").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-id");
+            const detail = await apiFetch(`/readers/${id}`);
+            fillForm(detail.reader);
+            show("Đã nạp dữ liệu độc giả. Hãy thực hiện chỉnh sửa.", true);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          });
+        });
+      } catch (e) { show(e.message); }
+    }
+
+    document.getElementById("btnSearch").addEventListener("click", () => load());
+
+    document.getElementById("btnSave").addEventListener("click", async () => {
+      show("Đang xử lý...", true);
+      try {
+        const id = document.getElementById("id").value.trim();
+        const payload = getForm();
+
+        if (!payload.code || !payload.name || !payload.barcode)
+          throw new Error("Vui lòng nhập đủ Mã độc giả, Họ tên và Barcode.");
+
+        if (id) {
+          await apiFetch(`/readers/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+          show("✅ Cập nhật thông tin độc giả thành công", true);
+        } else {
+          await apiFetch("/readers", { method: "POST", body: JSON.stringify(payload) });
+          show("✅ Thêm mới độc giả thành công", true);
+        }
+        clearForm();
+        await load();
+      } catch (e) { show(e.message); }
+    });
+
+    load();
+  </script>
+</body>
+
+</html>

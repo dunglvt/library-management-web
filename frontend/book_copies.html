@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quản lý quyển sách (Kho)</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <style>
+    /* Badge trạng thái */
+    .badge {
+      display: inline-flex !important;
+      align-items: center;
+      justify-content: center;
+      min-width: 100px !important;
+      height: 28px !important;
+      white-space: nowrap !important;
+      border-radius: 6px !important;
+      font-size: 0.8rem !important;
+      font-weight: 600 !important;
+      padding: 0 10px !important;
+    }
+
+    .AVAILABLE {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+    }
+
+    .BORROWED {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+
+    .LOST {
+      background: #fef2f2;
+      color: #be123c;
+      border: 1px solid #fecaca;
+    }
+
+    .DAMAGED {
+      background: #fff7ed;
+      color: #c2410c;
+      border: 1px solid #fdba74;
+    }
+
+    /* Hint box giống trang đầu sách */
+    .hint-box {
+      background: #f0f9ff;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px dashed #bae6fd;
+      font-size: 0.9rem;
+      color: #0369a1;
+      margin-top: 8px;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+
+<body>
+  <nav id="nav"></nav>
+
+  <div class="container">
+    <div class="card">
+      <h1>Quản lý quyển sách (Kho)</h1>
+
+      <div class="row">
+        <div class="col">
+          <h3>Thêm / Sửa bản sao</h3>
+          <input type="hidden" id="id" />
+
+          <label>Chọn đầu sách <span style="color:red">*</span></label>
+          <select id="title_id" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+          </select>
+
+          <label>Mã vạch (Barcode)</label>
+          <input id="barcode" placeholder="Hệ thống tự sinh (VD: GT-001-01)"
+            style="background: #f1f5f9; color: #64748b; font-style: italic; cursor: not-allowed;" readonly />
+
+          <div class="hint-box">
+            <strong>💡 Cơ chế tự động:</strong>
+            <div style="margin-top:5px; font-size:0.85rem; color:#334155;">
+              Khi bạn bấm <b>Lưu</b>, hệ thống sẽ tự động lấy Mã cha + Số thứ tự tiếp theo.
+              <br>Ví dụ: Đầu sách <b>GT-001</b> đang có 2 cuốn, cuốn mới sẽ là <b>GT-001-03</b>.
+            </div>
+          </div>
+
+          <label>Trạng thái</label>
+          <select id="status" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+            <option value="AVAILABLE">✅ Sẵn sàng</option>
+            <option value="BORROWED">📖 Đang mượn</option>
+            <option value="LOST">❌ Đã mất</option>
+            <option value="DAMAGED">⚠️ Hư hỏng</option>
+          </select>
+
+          <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="primary" id="btnSave">Lưu</button>
+            <button id="btnClear">Xóa form</button>
+          </div>
+          <div id="msg"></div>
+        </div>
+
+        <div class="col">
+          <h3>Danh sách trong kho</h3>
+          <div style="display:flex; gap:5px; margin-bottom:10px;">
+            <input id="q" placeholder="Nhập barcode, tên sách..." autocomplete="off" />
+            <button id="btnSearch">Tìm</button>
+          </div>
+          <div id="list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script>
+    const user = requireLogin();
+    renderNav("nav");
+
+    const msg = document.getElementById("msg");
+    const show = (t, ok = false) => msg.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${t}</div>`;
+
+    // --- LOGIC JS ---
+
+    // 1. Đổ dữ liệu lên form khi sửa
+    function fillForm(r) {
+      document.getElementById("id").value = r.id;
+      document.getElementById("title_id").value = r.title_id;
+
+      // Khi sửa thì hiện mã vạch thật lên (nhưng vẫn khóa không cho sửa để tránh lỗi in tem)
+      document.getElementById("barcode").value = r.barcode;
+
+      document.getElementById("status").value = r.status;
+
+      // Đổi màu nền một chút để biết là đang chế độ xem
+      document.getElementById("barcode").style.backgroundColor = "#fff";
+      document.getElementById("barcode").style.color = "#000";
+    }
+
+    // 2. Xóa form (Về trạng thái thêm mới)
+    function clearForm() {
+      document.getElementById("id").value = "";
+      document.getElementById("title_id").selectedIndex = 0; // Chọn cái đầu tiên
+
+      // Reset về trạng thái "Tự động sinh"
+      document.getElementById("barcode").value = "";
+      document.getElementById("barcode").placeholder = "Hệ thống tự sinh (VD: GT-001-01)";
+      document.getElementById("barcode").style.backgroundColor = "#f1f5f9";
+      document.getElementById("barcode").style.color = "#64748b";
+
+      document.getElementById("status").value = "AVAILABLE";
+      msg.innerHTML = "";
+    }
+
+    async function loadTitles() {
+      try {
+        const res = await apiFetch("/books/titles");
+        const rows = res.data || [];
+        // Hiển thị: Tên sách (Mã cha) để dễ chọn
+        document.getElementById("title_id").innerHTML = rows.map(t =>
+          `<option value="${t.id}">${t.title} (${t.code})</option>`
+        ).join("");
+      } catch (e) { console.error(e); }
+    }
+
+    async function load() {
+      try {
+        const q = document.getElementById("q").value.trim();
+        const res = await apiFetch(`/books/copies?q=${encodeURIComponent(q)}`);
+        const rows = res.data || [];
+
+        const statusMap = {
+          'AVAILABLE': 'Sẵn sàng',
+          'BORROWED': 'Đang mượn',
+          'LOST': 'Đã mất',
+          'DAMAGED': 'Hư hỏng'
+        };
+
+        document.getElementById("list").innerHTML = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Mã vạch</th>
+                    <th>Tên sách</th>
+                    <th>Trạng thái</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows.map(r => `
+                <tr>
+                    <td><b style="color:#0f172a">${r.barcode}</b></td>
+                    <td>${r.title || r.book_title || 'Unknown'}</td>
+                    <td>
+                        <span class="badge ${r.status}">
+                            ${statusMap[r.status] || r.status}
+                        </span>
+                    </td>
+                    <td><button class="btnEdit" data-id="${r.id}">Sửa</button></td>
+                </tr>`).join("")}
+            </tbody>
+        </table>`;
+
+        const allRows = rows;
+        document.querySelectorAll(".btnEdit").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const id = btn.getAttribute("data-id");
+            const r = allRows.find(x => String(x.id) === String(id));
+            fillForm(r);
+            show("Đã nạp form. Bạn có thể sửa trạng thái.", true);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          });
+        });
+
+      } catch (e) { show(e.message); }
+    }
+
+    document.getElementById("btnSearch").addEventListener("click", load);
+    document.getElementById("btnClear").addEventListener("click", clearForm);
+
+    document.getElementById("btnSave").addEventListener("click", async () => {
+      show("Đang xử lý...", true);
+      try {
+        const id = document.getElementById("id").value.trim();
+
+        // Payload chỉ cần title_id và status. Barcode do Backend/Trigger tự lo.
+        const payload = {
+          title_id: Number(document.getElementById("title_id").value),
+          status: document.getElementById("status").value
+        };
+
+        // Nếu sửa thì gửi cả barcode cũ (để backend biết, dù ko đổi)
+        if (id) {
+          payload.barcode = document.getElementById("barcode").value;
+        }
+
+        if (id) {
+          await apiFetch(`/books/copies/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+          show("Cập nhật thành công!", true);
+        } else {
+          // Thêm mới: Không gửi barcode, để Trigger tự sinh
+          await apiFetch("/books/copies", { method: "POST", body: JSON.stringify(payload) });
+          show("Thêm mới thành công! Mã vạch đã được tạo tự động.", true);
+        }
+        clearForm();
+        load();
+      } catch (e) { show(e.message, false); }
+    });
+
+    (async () => {
+      await loadTitles();
+      await load();
+    })();
+  </script>
+</body>
+
+</html>

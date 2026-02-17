@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quản lý đầu sách</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* CSS cũ giữ nguyên */
+    .hint-box {
+      background: #f0f9ff;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px dashed #bae6fd;
+      font-size: 0.9rem;
+      color: #0369a1;
+      margin-top: 8px;
+      margin-bottom: 15px;
+    }
+
+    .preview-text {
+      margin-top: 10px;
+      font-weight: bold;
+      color: #0284c7;
+      font-size: 1.1rem;
+      border-top: 1px solid #bae6fd;
+      padding-top: 8px;
+    }
+
+    .code-input-group {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .code-part {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    .code-part:focus {
+      border-color: #0d9488;
+      outline: none;
+    }
+
+    /* CSS MỚI: Nút gợi ý */
+    .btn-suggest {
+      background: #e0f2fe;
+      color: #0284c7;
+      border: 1px solid #bae6fd;
+      padding: 0 10px;
+      height: 42px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s;
+    }
+
+    .btn-suggest:hover {
+      background: #bae6fd;
+      color: #0369a1;
+    }
+
+    .btn-suggest i {
+      font-size: 1.1rem;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+</head>
+
+<body>
+  <nav id="nav"></nav>
+
+  <div class="container">
+    <div class="card">
+      <h1>Quản lý đầu sách</h1>
+
+      <div class="row">
+        <div class="col">
+          <h3>Thêm / Sửa đầu sách</h3>
+          <input type="hidden" id="id" />
+
+          <label>Mã đầu sách <span style="color:red">*</span></label>
+
+          <div class="code-input-group">
+            <select id="part_cat" class="code-part" style="width: 160px;">
+              <option value="GT">GT (Giáo trình)</option>
+              <option value="VH">VH (Văn học)</option>
+              <option value="KT">KT (Kinh tế)</option>
+              <option value="TK">TK (Tham khảo)</option>
+              <option value="LUAN">LUAN (Luận văn)</option>
+              <option value="KHAC">KHAC (Khác)</option>
+            </select>
+
+            <span>-</span>
+
+            <input id="part_source" class="code-part" placeholder="PTIT"
+              style="width: 80px; text-transform: uppercase;" />
+
+            <span>-</span>
+
+            <input id="part_num" type="number" class="code-part" placeholder="001" style="flex: 1;" />
+
+            <button type="button" class="btn-suggest" id="btnAutoNum" title="Lấy số tiếp theo">
+              <i class="fas fa-magic"></i> Auto
+            </button>
+          </div>
+
+          <input type="hidden" id="code" />
+
+          <div class="hint-box">
+            <div class="preview-text">
+              👉 Mã sẽ tạo: <span id="preview_code" style="color:#e11d48">GT-???-???</span>
+            </div>
+            <div style="font-size:0.8rem; color:#64748b; margin-top:4px;">
+              <i>Hướng dẫn: Nhập nguồn (VD: PTIT) rồi bấm nút <b>Auto</b> để lấy số tiếp theo.</i>
+            </div>
+          </div>
+
+          <label>Tên sách</label>
+          <input id="title" placeholder="VD: Nhập môn Công nghệ phần mềm" />
+          <label>Tác giả</label>
+          <input id="author" placeholder="VD: Ngô Công Thắng" />
+          <label>Năm XB</label>
+          <input id="publish_year" type="number" placeholder="VD: 2022" />
+          <label>Giá bìa</label>
+          <input id="cover_price" type="number" value="0" />
+          <label>Nhà xuất bản</label>
+          <select id="publisher_id"></select>
+          <label>Mô tả</label>
+          <textarea id="description" rows="4"></textarea>
+
+          <div style="display:flex; gap:10px; margin-top:12px;">
+            <button class="primary" id="btnSave">Lưu</button>
+            <button id="btnClear">Xóa form</button>
+          </div>
+          <div id="msg"></div>
+        </div>
+
+        <div class="col">
+          <h3>Danh sách & Tìm kiếm</h3>
+          <div style="display:flex; gap:5px; margin-bottom:10px;">
+            <input id="q" placeholder="Nhập tên, mã..." autocomplete="off" />
+            <button id="btnSearch">Tìm</button>
+          </div>
+          <div id="list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script>
+    const user = requireLogin();
+    renderNav("nav");
+    const msg = document.getElementById("msg");
+    const show = (t, ok = false) => msg.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${t}</div>`;
+
+    // Biến toàn cục để lưu danh sách sách (dùng để tính số tiếp theo)
+    let globalBooks = [];
+
+    // --- 1. LOGIC TÍNH SỐ TIẾP THEO (AUTO-INCREMENT) ---
+    function getNextNumber(cat, source) {
+      if (!source) return 1;
+
+      // Tìm prefix ví dụ: "GT-PTIT-"
+      const prefix = `${cat}-${source.toUpperCase()}-`;
+
+      let maxNum = 0;
+
+      // Duyệt qua toàn bộ sách hiện có để tìm số lớn nhất của dòng này
+      globalBooks.forEach(book => {
+        if (book.code && book.code.startsWith(prefix)) {
+          // Tách phần số cuối cùng ra (GT-PTIT-005 -> lấy 005)
+          const parts = book.code.split('-');
+          const numPart = parseInt(parts[parts.length - 1]);
+          if (!isNaN(numPart) && numPart > maxNum) {
+            maxNum = numPart;
+          }
+        }
+      });
+
+      return maxNum + 1;
+    }
+
+    document.getElementById("btnAutoNum").addEventListener("click", () => {
+      const cat = document.getElementById("part_cat").value;
+      const source = document.getElementById("part_source").value.trim();
+
+      if (!source) {
+        alert("Vui lòng nhập Mã nguồn (VD: PTIT) trước khi bấm Auto!");
+        document.getElementById("part_source").focus();
+        return;
+      }
+
+      // Gọi hàm tính số
+      const nextNum = getNextNumber(cat, source);
+
+      // Điền vào ô input và cập nhật preview
+      document.getElementById("part_num").value = nextNum;
+      generateCode(); // Cập nhật lại mã full
+
+      // Hiệu ứng nháy nhẹ để người dùng biết đã điền
+      const inputNum = document.getElementById("part_num");
+      inputNum.style.backgroundColor = "#dcfce7"; // Xanh nhạt
+      setTimeout(() => inputNum.style.backgroundColor = "#fff", 500);
+    });
+
+    // --- 2. LOGIC GHÉP MÃ ---
+    const partCat = document.getElementById("part_cat");
+    const partSource = document.getElementById("part_source");
+    const partNum = document.getElementById("part_num");
+    const finalCodeEl = document.getElementById("code");
+    const previewEl = document.getElementById("preview_code");
+
+    function generateCode() {
+      const cat = partCat.value;
+      const source = partSource.value.toUpperCase().trim() || "???";
+      let num = "???";
+      if (partNum.value) {
+        num = partNum.value.toString().padStart(3, '0');
+      }
+      const fullCode = `${cat}-${source}-${num}`;
+
+      if (source !== "???" && num !== "???") finalCodeEl.value = fullCode;
+      else finalCodeEl.value = "";
+
+      previewEl.innerText = fullCode;
+    }
+
+    partCat.addEventListener("change", generateCode);
+    partSource.addEventListener("input", generateCode);
+    partNum.addEventListener("input", generateCode);
+
+    // --- 3. CÁC HÀM CRUD CƠ BẢN (Giữ nguyên logic cũ) ---
+    function getPayload() {
+      return {
+        code: document.getElementById("code").value.trim(),
+        title: document.getElementById("title").value.trim(),
+        author: document.getElementById("author").value.trim(),
+        publish_year: Number(document.getElementById("publish_year").value),
+        cover_price: Number(document.getElementById("cover_price").value),
+        publisher_id: Number(document.getElementById("publisher_id").value),
+        description: document.getElementById("description").value.trim(),
+      };
+    }
+
+    function fillForm(r) {
+      document.getElementById("id").value = r.id;
+      if (r.code && r.code.includes("-")) {
+        const parts = r.code.split("-");
+        if (parts.length >= 3) {
+          document.getElementById("part_cat").value = parts[0];
+          document.getElementById("part_source").value = parts[1];
+          document.getElementById("part_num").value = parseInt(parts[2]);
+        }
+        else if (parts.length === 2) {
+          document.getElementById("part_cat").value = parts[0];
+          document.getElementById("part_source").value = "";
+          document.getElementById("part_num").value = parseInt(parts[1]);
+        }
+        generateCode();
+      } else {
+        document.getElementById("part_cat").value = "GT";
+        document.getElementById("part_source").value = r.code;
+        document.getElementById("part_num").value = "";
+        generateCode();
+      }
+      document.getElementById("title").value = r.title;
+      document.getElementById("author").value = r.author;
+      document.getElementById("publish_year").value = r.publish_year || "";
+      document.getElementById("cover_price").value = r.cover_price;
+      document.getElementById("publisher_id").value = r.publisher_id || "";
+      document.getElementById("description").value = r.description || "";
+    }
+
+    function clearForm() {
+      document.getElementById("id").value = "";
+      document.getElementById("part_cat").value = "GT";
+      document.getElementById("part_source").value = "";
+      document.getElementById("part_num").value = "";
+      generateCode();
+      document.getElementById("title").value = "";
+      document.getElementById("author").value = "";
+      document.getElementById("publish_year").value = "";
+      document.getElementById("cover_price").value = 0;
+      document.getElementById("description").value = "";
+      msg.innerHTML = "";
+    }
+
+    async function loadPublishers() {
+      try {
+        const res = await apiFetch("/publishers");
+        const rows = res.data || [];
+        document.getElementById("publisher_id").innerHTML = rows.map(p => `<option value="${p.id}">${p.name}</option>`).join("");
+      } catch (e) { console.error(e); }
+    }
+
+    async function load() {
+      try {
+        const q = document.getElementById("q").value.trim();
+        // Gọi API lấy danh sách
+        const res = await apiFetch(`/books/titles?q=${encodeURIComponent(q)}`);
+        const rows = res.data || [];
+
+        // LƯU LẠI VÀO BIẾN TOÀN CỤC ĐỂ DÙNG TÍNH SỐ AUTO
+        globalBooks = rows;
+
+        document.getElementById("list").innerHTML = `
+        <table>
+          <thead><tr><th>Mã</th><th>Tên</th><th>Tác giả</th><th>NXB</th><th></th></tr></thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr>
+                <td><b>${r.code}</b></td>
+                <td>${r.title}</td>
+                <td>${r.author}</td>
+                <td>${r.publisher_name || '-'}</td>
+                <td><button class="btnEdit" data-id="${r.id}">Sửa</button></td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`;
+
+        const allRows = rows;
+        document.querySelectorAll(".btnEdit").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const id = btn.getAttribute("data-id");
+            const r = allRows.find(x => String(x.id) === String(id));
+            fillForm(r);
+            show("Đã nạp dữ liệu. Hãy sửa và bấm Lưu.", true);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          });
+        });
+      } catch (e) { show(e.message); }
+    }
+
+    document.getElementById("btnSearch").addEventListener("click", load);
+    document.getElementById("btnClear").addEventListener("click", clearForm);
+
+    // --- CẬP NHẬT LOGIC LƯU (XỬ LÝ LỖI TRÙNG LẶP) ---
+    document.getElementById("btnSave").addEventListener("click", async () => {
+      // 1. Reset trạng thái cũ
+      show("Đang xử lý...", true);
+      document.getElementById("part_num").style.border = "1px solid #cbd5e1"; // Reset viền
+      document.getElementById("part_num").style.backgroundColor = "#fff";     // Reset nền
+
+      try {
+        const id = document.getElementById("id").value.trim();
+        const payload = getPayload();
+
+        // Validate cơ bản
+        if (!payload.code || payload.code.includes("???")) {
+          // Bôi đỏ ô số nếu chưa nhập
+          document.getElementById("part_num").style.border = "1px solid red";
+          document.getElementById("part_num").focus();
+          throw new Error("Mã sách chưa hợp lệ! Vui lòng nhập đủ Nguồn và Số.");
+        }
+        if (!payload.title) {
+          document.getElementById("title").focus();
+          throw new Error("Thiếu tên sách! Vui lòng nhập tên sách.");
+        }
+
+        // Gửi API
+        if (id) {
+          await apiFetch(`/books/titles/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+          show("✅ Cập nhật thành công!", true);
+        } else {
+          await apiFetch("/books/titles", { method: "POST", body: JSON.stringify(payload) });
+          show("✅ Thêm mới thành công!", true);
+        }
+
+        // Thành công thì xóa form và load lại
+        clearForm();
+        load();
+
+        // Cập nhật lại danh sách global để nút Auto tính đúng cho lần sau
+        const res = await apiFetch(`/books/titles`);
+        if (res.data) globalBooks = res.data;
+
+      } catch (e) {
+        // --- XỬ LÝ LỖI THÔNG MINH TẠI ĐÂY ---
+
+        // Nếu Server trả về lỗi "Duplicate entry" (Trùng khóa chính)
+        if (e.message && e.message.includes("Duplicate entry")) {
+          const duplicateCode = document.getElementById("code").value;
+
+          // 1. Hiện thông báo tiếng Việt dễ hiểu
+          show(`⚠️ Mã sách <b>${duplicateCode}</b> đã tồn tại trong hệ thống!<br>👉 Vui lòng nhập số khác hoặc bấm nút <b>Auto</b>.`, false);
+
+          // 2. Bôi đỏ ô nhập số để người dùng biết sai ở đâu
+          const numInput = document.getElementById("part_num");
+          numInput.style.border = "2px solid #ef4444"; // Viền đỏ đậm
+          numInput.style.backgroundColor = "#fee2e2";   // Nền đỏ nhạt
+          numInput.focus(); // Đưa con trỏ chuột vào đó luôn
+        }
+        else {
+          // Các lỗi khác thì hiện nguyên văn
+          show("❌ Lỗi: " + e.message, false);
+        }
+      }
+    });
+
+    (async () => {
+      await loadPublishers();
+      await load();
+      generateCode();
+    })();
+  </script>
+</body>
+
+</html>

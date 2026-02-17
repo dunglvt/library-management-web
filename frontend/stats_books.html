@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Báo cáo Thống kê Sách</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <style>
+    /* --- CSS CHO BÁO CÁO THỐNG KÊ (CHUẨN MỰC) --- */
+
+    /* 1. Khung bộ lọc bên trái */
+    .filter-box {
+      background: #f8fafc;
+      padding: 24px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+    }
+
+    /* 2. Style Bảng dữ liệu (Dạng Report) */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      font-size: 0.95rem;
+    }
+
+    th {
+      background: #f1f5f9;
+      /* Nền header xám nhẹ */
+      color: #475569;
+      /* Chữ xám đậm */
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+      padding: 12px 16px;
+      border-bottom: 2px solid #e2e8f0;
+      text-align: left;
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #e2e8f0;
+      color: #334155;
+      vertical-align: middle;
+    }
+
+    tr:hover td {
+      background: #f8fafc;
+    }
+
+    /* Cột số liệu căn phải */
+    td.num,
+    th.num {
+      text-align: right;
+    }
+
+    /* Dòng tổng kết số liệu */
+    .summary-bar {
+      background: #ecfdf5;
+      /* Xanh ngọc rất nhạt */
+      color: #047857;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #a7f3d0;
+      margin-bottom: 20px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+</head>
+
+<body>
+  <nav id="nav"></nav>
+
+  <div class="container">
+    <div class="card">
+      <h1>Báo cáo Thống kê Sách</h1>
+
+      <div class="row">
+
+        <div class="col" style="flex: 0 0 300px;">
+          <div class="filter-box">
+            <h3 style="margin-top:0; color:#334155; font-size:1.1rem;">Chọn khoảng thời gian</h3>
+
+            <label>Từ ngày</label>
+            <input id="from" type="date" />
+
+            <label>Đến ngày</label>
+            <input id="to" type="date" />
+
+            <button style="margin-top:24px; width: 100%;" class="primary" id="btnRun">
+              Xem báo cáo
+            </button>
+
+            <div class="small" style="margin-top:15px; color: #64748b; font-style: italic;">
+              Lưu ý: Nhập đúng định dạng ngày.
+            </div>
+
+            <div id="msg"></div>
+          </div>
+        </div>
+
+        <div class="col" style="flex: 1;">
+          <h3 style="margin-top:0;">📋 Kết quả thống kê</h3>
+
+          <div id="out">
+            <div
+              style="padding:40px; text-align:center; color:#94a3b8; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1;">
+              Vui lòng bấm nút "Xem báo cáo"
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script>
+    const user = requireLogin();
+    renderNav("nav");
+
+    const msg = document.getElementById("msg");
+    const show = (t, ok = false) => msg.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${t}</div>`;
+
+    document.getElementById("btnRun").addEventListener("click", async () => {
+      msg.innerHTML = "";
+      try {
+        const from = document.getElementById("from").value;
+        const to = document.getElementById("to").value;
+
+        if (!from || !to) {
+          show("Vui lòng chọn đầy đủ thời gian!");
+          return;
+        }
+
+        const data = await apiFetch(`/stats/books?from=${from}&to=${to}`);
+        const rows = data.data || [];
+
+        if (rows.length === 0) {
+          document.getElementById("out").innerHTML = `
+            <div style="padding:30px; text-align:center; color:#64748b;">
+                🚫 Không có dữ liệu trong khoảng thời gian này.
+            </div>`;
+          return;
+        }
+
+        // Tính tổng
+        const totalBorrows = rows.reduce((sum, r) => sum + (r.borrow_count || 0), 0);
+
+        document.getElementById("out").innerHTML = `
+        
+        <div class="summary-bar">
+            <span>📅 Dữ liệu từ <b>${from}</b> đến <b>${to}</b></span>
+            <span>Tổng lượt mượn: <b style="font-size:1.2rem;">${totalBorrows}</b></span>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+                <th style="width: 50px;">STT</th>
+                <th style="width: 120px;">Mã</th>
+                <th>Tên đầu sách</th>
+                <th>Tác giả</th>
+                <th class="num" style="width: 120px;">Lượt mượn</th>
+                <th style="width: 80px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((r, i) => `
+            <tr>
+                <td style="color:#64748b;">${i + 1}</td>
+                <td><b>${r.title_code || '---'}</b></td>
+                <td>
+                    <div style="font-weight:600;">${r.title}</div>
+                </td>
+                <td>${r.author}</td>
+                <td class="num">
+                    <span style="font-weight:bold; color:#0f172a;">${r.borrow_count}</span>
+                </td>
+                <td style="text-align:center;">
+                    <a href="stats_book_detail.html?title_id=${r.title_id}&from=${from}&to=${to}" 
+                       style="font-size:0.85rem; text-decoration:none; color:var(--accent);">
+                       Chi tiết
+                    </a>
+                </td>
+            </tr>`).join("")}
+          </tbody>
+        </table>`;
+
+        show("Đã tải xong dữ liệu.", true);
+
+      } catch (e) { show(e.message); }
+    });
+
+    (function autoRunFromUrl() {
+      const params = new URLSearchParams(location.search);
+      const from = params.get("from");
+      const to = params.get("to");
+
+      if (from && to) {
+        document.getElementById("from").value = from;
+        document.getElementById("to").value = to;
+        document.getElementById("btnRun").click();
+      }
+    })();
+  </script>
+</body>
+
+</html>

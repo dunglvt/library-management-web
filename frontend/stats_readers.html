@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thống kê độc giả theo lượt mượn</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* CSS Giao diện Báo cáo Chuyên nghiệp */
+    .filter-box {
+      background: #f8fafc;
+      padding: 24px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      font-size: 0.95rem;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #475569;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+      padding: 12px 16px;
+      border-bottom: 2px solid #e2e8f0;
+      text-align: left;
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #e2e8f0;
+      color: #334155;
+      vertical-align: middle;
+    }
+
+    tr:hover td {
+      background: #f8fafc;
+    }
+  </style>
+</head>
+
+<body>
+  <nav id="nav"></nav>
+
+  <div class="container">
+    <div class="card">
+      <h1>Thống kê độc giả theo lượt mượn</h1>
+
+      <div class="row">
+        <div class="col" style="flex: 0 0 300px;">
+          <div class="filter-box">
+            <h3 style="margin-top:0; color:#334155; font-size:1.1rem;">Chọn khoảng thời gian</h3>
+
+            <label>Từ ngày</label>
+            <input id="from" type="date" />
+
+            <label>Đến ngày</label>
+            <input id="to" type="date" />
+
+            <button style="margin-top:24px; width: 100%;" class="primary" id="btnRun">Thống kê</button>
+
+            <div class="small" style="margin-top:15px; color: #64748b; font-style: italic;">Lưu ý: Nhập đúng định dạng
+              ngày.</div>
+            <div id="msg"></div>
+          </div>
+        </div>
+
+        <div class="col" style="flex: 1;">
+          <h3 style="margin-top:0;">📋 Kết quả</h3>
+          <div id="out">
+            <div
+              style="padding:40px; text-align:center; color:#94a3b8; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1;">
+              Vui lòng bấm nút "Thống kê"
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script>
+    // --- GIỮ NGUYÊN 100% LOGIC CŨ ---
+    const user = requireLogin();
+    renderNav("nav");
+
+    const msg = document.getElementById("msg");
+    const show = (t, ok = false) => msg.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${t}</div>`;
+
+    document.getElementById("btnRun").addEventListener("click", async () => {
+      msg.innerHTML = "";
+      try {
+        const from = document.getElementById("from").value;
+        const to = document.getElementById("to").value;
+        if (!from || !to) throw new Error("Vui lòng chọn đủ thời gian bắt đầu và kết thúc!");
+
+        const data = await apiFetch(`/stats/readers?from=${from}&to=${to}`);
+        const rows = data.data || [];
+
+        if (rows.length === 0) {
+          document.getElementById("out").innerHTML = "<div class='msg err' style='margin-top:0'>Không tìm thấy dữ liệu!</div>";
+          return;
+        }
+
+        document.getElementById("out").innerHTML = `
+      <table>
+        <thead><tr><th style="width:50px">#</th><th>Mã ĐỘC GIẢ</th><th>Tên độc giả</th><th>SĐT</th><th style="text-align:right">Lượt mượn</th></tr></thead>
+        <tbody>
+          ${rows.map((r, i) => `
+            <tr>
+                <td style="color:#64748b">${i + 1}</td>
+                <td><b>${r.code}</b></td>
+                <td><div style="font-weight:600">${r.name}</div></td>
+                <td>${r.phone || "---"}</td>
+                <td style="text-align:right"><b style="color:#0f172a">${r.borrow_count}</b></td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+        show("Xong!", true);
+      } catch (e) { show(e.message); }
+    });
+  </script>
+</body>
+
+</html>

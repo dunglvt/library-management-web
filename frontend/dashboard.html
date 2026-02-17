@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard - Quản lý thư viện</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Dashboard</h1>
+      <div class="small" id="who"></div>
+      <nav id="nav"></nav>
+
+      <hr />
+      <h3>Hướng dẫn nhanh</h3>
+      <ul class="small">
+        <li><b>Thủ thư</b>: thêm Nhà xuất bản → thêm Đầu sách → thêm Quyển sách (barcode) → thêm Độc giả → Cho mượn/Trả
+          sách.</li>
+        <li><b>Quản lý</b>: vào mục Thống kê để xem sách/độc giả theo khoảng thời gian.</li>
+      </ul>
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script>
+    const user = requireLogin();
+    document.getElementById("who").textContent = `Đăng nhập: ${user.username} (${user.role})`;
+    renderNav("nav");
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chi tiết lượt mượn của 1 đầu sách</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Chi tiết lượt mượn của 1 đầu sách</h1>
+      <nav id="nav"></nav>
+
+      <div class="small"><a id="btnBack" href="#">← Quay lại thống kê sách</a></div>
+      <hr />
+      <div id="head"></div>
+
+      <h3>Danh sách các lần mượn</h3>
+      <div id="out"></div>
+      <div id="msg"></div>
+
+    </div>
+  </div>
+  <script src="api.js"></script>
+  <script>
+    // --- THÊM HÀM FORMAT NGÀY ---
+    function formatDate(dateString) {
+      if (!dateString) return "";
+      const d = new Date(dateString);
+      return d.toLocaleDateString('vi-VN');
+    }
+
+    const user = requireLogin();
+    renderNav("nav");
+
+    // --- THÊM ĐOẠN NÀY ---
+    // Lấy ngày tháng hiện tại trên URL của trang chi tiết
+    const urlParams = new URLSearchParams(location.search);
+    const pFrom = urlParams.get("from");
+    const pTo = urlParams.get("to");
+
+    // Cập nhật nút Back để nó mang theo ngày tháng cũ
+    if (pFrom && pTo) {
+      document.getElementById("btnBack").href = `stats_books.html?from=${pFrom}&to=${pTo}`;
+    } else {
+      document.getElementById("btnBack").href = "stats_books.html";
+    }
+
+    const msg = document.getElementById("msg");
+    const show = (t, ok = false) => msg.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${t}</div>`;
+
+    function getParam(name) {
+      const u = new URL(location.href);
+      return u.searchParams.get(name);
+    }
+    const title_id = getParam("title_id");
+    const from = getParam("from");
+    const to = getParam("to");
+
+    (async () => {
+      try {
+        if (!title_id || !from || !to) throw new Error("Thiếu tham số title_id/from/to trên URL");
+        const data = await apiFetch(`/stats/books/${title_id}/borrows?from=${from}&to=${to}`);
+        const title = data.title;
+        document.getElementById("head").innerHTML = `
+      <div class="msg ok">
+        <b>${title ? title.title : ""}</b> ${title ? `(Mã: ${title.code})` : ""}<br/>
+        Tác giả: ${title ? title.author : ""}<br/>
+        Khoảng thời gian: <b>${formatDate(from)}</b> đến <b>${formatDate(to)}</b>
+      </div>
+    `;
+        const rows = data.data || [];
+        if (rows.length === 0) {
+          document.getElementById("out").innerHTML = "<div class='msg err'>Không có lượt mượn trong khoảng thời gian này.</div>";
+          return;
+        }
+        document.getElementById("out").innerHTML = `
+      <table>
+        <thead><tr><th>Ngày mượn</th><th>Độc giả</th><th>Mã quyển sách</th><th>Ngày trả</th><th>Tiền phạt</th><th>Phiếu</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td>${formatDate(r.borrow_date)}</td> <td>${r.reader_name} (${r.reader_code})</td>
+              <td>${r.copy_barcode}</td>
+              <td>${formatDate(r.return_date)}</td> <td>${r.total_fee || 0}</td>
+              <td><a href="stats_receipt_detail.html?receipt_id=${r.receipt_id}">Xem phiếu</a></td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    `;
+      } catch (e) { show(e.message); }
+    })();
+
+  </script>
+</body>
+
+</html>
