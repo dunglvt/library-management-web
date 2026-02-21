@@ -58,8 +58,7 @@
           <div class="filter-box">
             <h3 style="margin-top:0; color:#334155; font-size:1.1rem;">Thêm / Sửa lỗi hỏng</h3>
 
-            <label>ID (khi sửa)</label>
-            <input id="id" placeholder="Để trống khi thêm" style="background:#f1f5f9" readonly />
+            <input type="hidden" id="id" />
 
             <label>Tên lỗi</label>
             <input id="name" placeholder="VD: Rách bìa" autocomplete="off" />
@@ -98,8 +97,6 @@
       document.getElementById("id").value = "";
       document.getElementById("name").value = "";
       document.getElementById("default_fee").value = 0;
-      // Bỏ readonly khi thêm mới để tránh hiểu lầm, tuy nhiên logic cũ ID thường tự sinh hoặc readonly
-      // Ở đây tôi giữ nguyên logic code cũ của bạn là input ID vẫn cho nhập (hoặc readonly tùy bạn chỉnh sau)
     }
 
     document.getElementById("btnClear").addEventListener("click", () => { clearForm(); msg.innerHTML = ""; });
@@ -109,14 +106,23 @@
       const rows = data.data || [];
       document.getElementById("list").innerHTML = `
     <table>
-      <thead><tr><th style="width:50px">ID</th><th>Tên lỗi</th><th style="text-align:right">Phí mặc định</th><th style="width:80px"></th></tr></thead>
+      <thead>
+        <tr>
+          <th style="width:50px; text-align:center">STT</th>
+          <th>Tên lỗi</th>
+          <th style="text-align:right">Phí mặc định</th>
+          <th style="width:80px"></th>
+        </tr>
+      </thead>
       <tbody>
-        ${rows.map(r => `
+        ${rows.map((r, index) => `
           <tr>
-            <td style="color:#64748b">${r.id}</td>
+            <td style="color:#64748b; text-align:center; font-weight:bold">${index + 1}</td>
             <td><b>${r.name}</b></td>
-            <td style="text-align:right; font-weight:600">${Number(r.default_fee).toLocaleString('vi-VN')}</td>
-            <td style="text-align:center"><button class="btnEdit" data-id="${r.id}" style="color:var(--accent); background:none; border:none; cursor:pointer; font-weight:600">Sửa</button></td>
+            <td style="text-align:right; font-weight:600">${Number(r.default_fee).toLocaleString('vi-VN')} VNĐ</td>
+            <td style="text-align:center">
+              <button class="btnEdit" data-id="${r.id}" style="color:var(--accent); background:none; border:none; cursor:pointer; font-weight:600">Sửa</button>
+            </td>
           </tr>`).join("")}
       </tbody>
     </table>`;

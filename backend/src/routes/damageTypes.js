@@ -14,23 +14,58 @@ damageTypesRouter.get('/', asyncHandler(async (req, res) => {
   res.json({ data: rows });
 }));
 
-// CHỈ QUẢN LÝ MỚI ĐƯỢC THÊM/SỬA (Đã sửa chỗ này)
+// CHỈ QUẢN LÝ MỚI ĐƯỢC THÊM/SỬA
 damageTypesRouter.post('/', requireRole('MANAGER'), asyncHandler(async (req, res) => {
-  const schema = z.object({ name: z.string().min(1), default_fee: z.number().nonnegative().default(0) });
-  const data = schema.parse(req.body);
-  const pool = getPool();
-  await pool.query('INSERT INTO damage_types(name, default_fee) VALUES(:name,:default_fee)', data);
-  res.json({ message: 'Đã thêm lỗi hỏng' });
+  try {
+    // 1. Dịch câu báo lỗi của Zod ngay trong schema
+    const schema = z.object({
+      name: z.string().min(1, "Vui lòng nhập tên lỗi hỏng!"),
+      default_fee: z.number().nonnegative("Phí phạt không được là số âm!").default(0)
+    });
+
+    const data = schema.parse(req.body);
+    const pool = getPool();
+    await pool.query('INSERT INTO damage_types(name, default_fee) VALUES(:name,:default_fee)', data);
+    res.json({ message: 'Đã thêm lỗi hỏng thành công!' });
+
+  } catch (error) {
+    // 2. Bắt lỗi nhập số âm hoặc để trống từ Zod
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: error.errors[0].message });
+    }
+    // 3. Bắt lỗi trùng tên từ MySQL
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ message: 'Tên lỗi hỏng này đã tồn tại!' });
+    }
+    // Lỗi hệ thống khác
+    throw error;
+  }
 }));
 
-// CHỈ QUẢN LÝ MỚI ĐƯỢC SỬA (Đã sửa chỗ này)
+// CHỈ QUẢN LÝ MỚI ĐƯỢC SỬA
 damageTypesRouter.put('/:id', requireRole('MANAGER'), asyncHandler(async (req, res) => {
-  const id = Number(req.params.id);
-  const schema = z.object({ name: z.string().min(1), default_fee: z.number().nonnegative().default(0) });
-  const data = schema.parse(req.body);
-  const pool = getPool();
-  await pool.query('UPDATE damage_types SET name=:name, default_fee=:default_fee WHERE id=:id', { ...data, id });
-  res.json({ message: 'Đã cập nhật lỗi hỏng' });
+  try {
+    const id = Number(req.params.id);
+    const schema = z.object({
+      name: z.string().min(1, "Vui lòng nhập tên lỗi hỏng!"),
+      default_fee: z.number().nonnegative("Phí phạt không được là số âm!").default(0)
+    });
+
+    const data = schema.parse(req.body);
+    const pool = getPool();
+    await pool.query('UPDATE damage_types SET name=:name, default_fee=:default_fee WHERE id=:id', { ...data, id });
+    res.json({ message: 'Đã cập nhật lỗi hỏng thành công!' });
+
+  } catch (error) {
+    // Bắt lỗi tương tự như POST
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: error.errors[0].message });
+    }
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ message: 'Tên lỗi hỏng này đã tồn tại!' });
+    }
+    throw error;
+  }
 }));
 
 damageTypesRouter.delete('/:id', requireRole('MANAGER'), asyncHandler(async (req, res) => {
