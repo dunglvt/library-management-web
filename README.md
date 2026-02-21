@@ -24,15 +24,13 @@
      - Manager/Admin: `admin` / `admin123`
      - Librarian/Thủ thư: `librarian` / `lib123`
 
-> Bạn có thể đổi mật khẩu bằng cách update bảng `users` (hoặc tạo user mới).
-
 ### Bước B — Chạy Backend
 1. Mở terminal tại thư mục `backend`.
 2. Cài thư viện:
    ```bash
    npm install
    ```
-3. Tạo file `.env` (copy từ `.env.example`) và điền mật khẩu MySQL của bạn:
+3. Tạo file `.env` (copy từ `.env.example`) và điền mật khẩu MySQL:
    ```bash
    cp .env.example .env
    ```
@@ -62,5 +60,5 @@ Hoặc mở trực tiếp file `frontend/login.html` bằng trình duyệt (nế
 
 ## 6) Ghi chú
 - Phạt trả muộn: nếu trả quá hạn (due_date) → phạt = 20% giá bìa (theo tài liệu tham khảo).
-- Due date mặc định = ngày mượn + 30 ngày.
+- Due date mặc định = ngày mượn + 120 ngày.
 # library-management-web
